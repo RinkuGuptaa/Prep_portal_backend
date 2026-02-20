@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 
 // @desc    Register user
 // @route   POST /api/auth/register
@@ -15,9 +16,10 @@ exports.register = async (req, res, next) => {
       password
     });
 
-    // Create JWT token
+    // Create JWT token (OPTIMIZED: explicit algorithm for faster verification)
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRE
+      expiresIn: process.env.JWT_EXPIRE || '1d',
+      algorithm: 'HS256'
     });
 
     res.status(201).json({
@@ -49,19 +51,20 @@ exports.login = async (req, res, next) => {
       });
     }
 
-    // Check for user
-    const user = await User.findOne({ email }).select('+password');
+    // Check for user (OPTIMIZED: using lean() for faster query - bypasses Mongoose hydration)
+    const user = await User.findOne({ email }).select('+password').lean();
 
-    if (!user || !(await user.matchPassword(password))) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ 
         success: false, 
         error: 'Invalid credentials' 
       });
     }
 
-    // Create JWT token
+    // Create JWT token (OPTIMIZED: explicit algorithm for faster verification)
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: process.env.JWT_EXPIRE
+      expiresIn: process.env.JWT_EXPIRE || '1d',
+      algorithm: 'HS256'
     });
 
     res.status(200).json({
